@@ -1,0 +1,4 @@
+
+> sologsb-1028-component-spec-a11y-workbench@1.0.0 typecheck
+> tsc --noEmit
+

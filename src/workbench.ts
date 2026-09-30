@@ -2,7 +2,7 @@ import { LitElement, css, html, nothing, type TemplateResult } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { diffAgainstSnapshot } from './diff';
 import { SpecStore } from './store';
-import type { ComponentExample, ComponentSpec, PreviewDensity, PreviewTheme, PropertySpec, ValidationIssue } from './types';
+import type { ComponentExample, ComponentSpec, MergeConflict, PreviewDensity, PreviewTheme, PropertySpec, ValidationIssue } from './types';
 
 type EditorTab = 'overview' | 'api' | 'accessibility' | 'examples' | 'history';
 
@@ -116,6 +116,39 @@ export class SpecA11yWorkbench extends LitElement {
     .search-empty { padding: 20px 8px; color: var(--spectrum-gray-700); font-size: 13px; }
     .footer-hint { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 30; background: #202020; color: white; border-radius: 999px; padding: 6px 12px; font-size: 11px; opacity: .9; }
     sp-toast { position: fixed; right: 18px; bottom: 18px; z-index: 50; }
+    .conflict-badge {
+      display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+      background: var(--spectrum-orange-200); color: var(--spectrum-orange-900, #6b3a00);
+      border: 1px solid var(--spectrum-orange-500); border-radius: 999px;
+      padding: 3px 10px; font-size: 12px; font-weight: 700;
+    }
+    .conflict-center {
+      grid-column: 1 / -1;
+      margin: 16px 18px 0; padding: 16px 18px;
+      border: 1px solid var(--spectrum-orange-500); border-left-width: 5px;
+      border-radius: 14px; background: color-mix(in srgb, var(--spectrum-orange-100) 80%, white);
+    }
+    .conflict-head h2 { margin: 0; font-size: 14px; color: #6b3a00; }
+    .conflict-head p { margin: 5px 0 12px; font-size: 12px; color: #5d4010; }
+    .conflict-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+    .conflict-card { border: 1px solid var(--spectrum-orange-400); border-radius: 12px; background: var(--spectrum-gray-50); padding: 12px; display: grid; gap: 10px; }
+    .conflict-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+    .conflict-options { display: grid; gap: 8px; }
+    .conflict-option {
+      display: grid; gap: 6px; text-align: left; width: 100%; cursor: pointer;
+      border: 1px solid var(--spectrum-gray-400); border-radius: 10px; padding: 9px 10px;
+      background: white; color: inherit; font: inherit;
+    }
+    .conflict-option:hover { border-color: var(--spectrum-blue-600); background: var(--spectrum-blue-100); }
+    .conflict-option .latest { border-style: dashed; }
+    .option-meta { font-size: 11px; color: var(--spectrum-gray-700); }
+    .option-value { font-size: 13px; font-weight: 600; white-space: pre-wrap; word-break: break-word; }
+    .conflict-option pre { margin: 0; max-height: 150px; overflow: auto; font-size: 11px; }
+    .option-choose { font-size: 12px; font-weight: 700; color: var(--spectrum-blue-800); }
+    .conflict-actions { display: flex; justify-content: flex-end; }
+    .text-link { border: 0; background: transparent; color: var(--spectrum-blue-800); font: inherit; cursor: pointer; text-decoration: underline; padding: 0; font-size: 12px; }
+    .has-conflict { border-color: var(--spectrum-orange-500); box-shadow: 0 0 0 1px var(--spectrum-orange-400); }
+    .field-conflict textarea, .field-conflict input { border-color: var(--spectrum-orange-600); outline-color: var(--spectrum-orange-400); }
     @media (max-width: 1180px) {
       .layout { grid-template-columns: 230px minmax(0, 1fr); }
       .inspector { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--spectrum-gray-300); grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -139,16 +172,23 @@ export class SpecA11yWorkbench extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this.store.addEventListener('change', this.onStoreChange);
+    this.store.addEventListener('merge', this.onMerge as EventListener);
     window.addEventListener('keydown', this.onKeyDown);
   }
 
   disconnectedCallback() {
     this.store.removeEventListener('change', this.onStoreChange);
+    this.store.removeEventListener('merge', this.onMerge as EventListener);
     window.removeEventListener('keydown', this.onKeyDown);
   }
 
   private onStoreChange = () => {
     this.requestUpdate();
+  };
+
+  private onMerge = (event: CustomEvent<{ toast?: string; newConflicts: boolean }>) => {
+    const toast = event.detail.toast;
+    if (toast) this.flash(toast);
   };
 
   private onKeyDown = (event: KeyboardEvent) => {
@@ -204,10 +244,12 @@ export class SpecA11yWorkbench extends LitElement {
               <sp-button variant="secondary" ?disabled=${!this.store.canUndo} @click=${() => this.store.undo()}>撤销</sp-button>
               <sp-button variant="secondary" ?disabled=${!this.store.canRedo} @click=${() => this.store.redo()}>重做</sp-button>
               <sp-button variant="accent" @click=${() => { this.store.createSnapshot('工具栏保存'); this.flash('版本已保存'); }}>保存版本</sp-button>
-              <span class="save-state">本地自动保存 · ${selected?.revision ?? 0} 版</span>
+              ${this.store.conflicts.length ? html`<span class="conflict-badge" title="其他标签页存在待选择的合并冲突">⚠ ${this.store.conflicts.length} 处冲突待选择</span>` : nothing}
+              <span class="save-state">本地自动保存（多标签页自动合并）· ${selected?.revision ?? 0} 版</span>
             </div>
           </header>
           <div class="layout">
+            ${this.store.conflicts.length ? this.renderConflictCenter() : nothing}
             <aside class="sidebar" aria-label="组件目录">
               <div class="sidebar-heading">
                 <h2>组件目录</h2>
@@ -300,25 +342,30 @@ export class SpecA11yWorkbench extends LitElement {
         </div>
         <div class="form-grid" style="margin-top: 18px">
           <label class="field full"><span>状态说明</span><textarea .value=${component.states} @change=${(event: Event) => this.store.updateComponent({ states: (event.currentTarget as HTMLTextAreaElement).value })}></textarea></label>
-          <label class="field full"><span>交互签名（修改后会标记关联示例失效）</span><textarea .value=${component.interactionSignature} @change=${(event: Event) => this.store.updateComponent({ interactionSignature: (event.currentTarget as HTMLTextAreaElement).value }, true)}></textarea></label>
+          <label class="field full"><span>交互签名（修改后会标记关联示例失效）</span><textarea .value=${component.interactionSignature} @change=${(event: Event) => this.store.updateComponent({ interactionSignature: (event.currentTarget as HTMLTextAreaElement).value })}></textarea></label>
         </div>
       </section>
     `;
   }
 
   private renderProperty(property: PropertySpec): TemplateResult {
+    const conflicts = this.store.conflicts.filter(
+      (conflict) => conflict.kind === 'property' && conflict.targetId === property.id
+    );
+    const conflictingFields = new Set(conflicts.map((conflict) => conflict.field));
     return html`
-      <article class="property-card">
+      <article class="property-card ${conflicts.length ? 'has-conflict' : ''}">
+        ${conflicts.length ? html`<div class="issue warning"><strong>${conflicts.length} 个字段存在跨标签页冲突</strong>请在顶部“合并冲突”面板中选择要保留的值。</div>` : nothing}
         <div class="property-head">
           <strong>${property.name || '未命名属性'}</strong>
           <sp-action-button size="s" label="删除属性" @click=${() => this.store.removeProperty(property.id)}>删除</sp-action-button>
         </div>
         <div class="form-grid">
-          <label class="field"><span>名称</span><input type="text" .value=${property.name} @change=${(event: Event) => this.store.updateProperty(property.id, { name: (event.currentTarget as HTMLInputElement).value })} /></label>
-          <label class="field"><span>类型</span><input type="text" .value=${property.type} @change=${(event: Event) => this.store.updateProperty(property.id, { type: (event.currentTarget as HTMLInputElement).value })} /></label>
-          <label class="field"><span>默认值</span><input type="text" .value=${property.defaultValue} @change=${(event: Event) => this.store.updateProperty(property.id, { defaultValue: (event.currentTarget as HTMLInputElement).value })} /></label>
-          <label class="inline"><input type="checkbox" .checked=${property.required} @change=${(event: Event) => this.store.updateProperty(property.id, { required: (event.currentTarget as HTMLInputElement).checked })} /> 必填属性</label>
-          <label class="field full"><span>属性说明</span><textarea .value=${property.description} @change=${(event: Event) => this.store.updateProperty(property.id, { description: (event.currentTarget as HTMLTextAreaElement).value })}></textarea></label>
+          <label class="field ${conflictingFields.has('name') ? 'field-conflict' : ''}"><span>名称</span><input type="text" .value=${property.name} @change=${(event: Event) => this.store.updateProperty(property.id, { name: (event.currentTarget as HTMLInputElement).value })} /></label>
+          <label class="field ${conflictingFields.has('type') ? 'field-conflict' : ''}"><span>类型</span><input type="text" .value=${property.type} @change=${(event: Event) => this.store.updateProperty(property.id, { type: (event.currentTarget as HTMLInputElement).value })} /></label>
+          <label class="field ${conflictingFields.has('defaultValue') ? 'field-conflict' : ''}"><span>默认值</span><input type="text" .value=${property.defaultValue} @change=${(event: Event) => this.store.updateProperty(property.id, { defaultValue: (event.currentTarget as HTMLInputElement).value })} /></label>
+          <label class="inline ${conflictingFields.has('required') ? 'field-conflict' : ''}"><input type="checkbox" .checked=${property.required} @change=${(event: Event) => this.store.updateProperty(property.id, { required: (event.currentTarget as HTMLInputElement).checked })} /> 必填属性</label>
+          <label class="field full ${conflictingFields.has('description') ? 'field-conflict' : ''}"><span>属性说明</span><textarea .value=${property.description} @change=${(event: Event) => this.store.updateProperty(property.id, { description: (event.currentTarget as HTMLTextAreaElement).value })}></textarea></label>
         </div>
       </article>
     `;
@@ -328,7 +375,7 @@ export class SpecA11yWorkbench extends LitElement {
     return html`
       <section class="panel">
         <div class="form-grid">
-          <label class="field full"><span>键盘行为</span><textarea .value=${component.keyboardBehavior} @change=${(event: Event) => this.store.updateComponent({ keyboardBehavior: (event.currentTarget as HTMLTextAreaElement).value }, true)}></textarea></label>
+          <label class="field full"><span>键盘行为</span><textarea .value=${component.keyboardBehavior} @change=${(event: Event) => this.store.updateComponent({ keyboardBehavior: (event.currentTarget as HTMLTextAreaElement).value })}></textarea></label>
           <label class="field full"><span>读屏说明</span><textarea .value=${component.screenReader} @change=${(event: Event) => this.store.updateComponent({ screenReader: (event.currentTarget as HTMLTextAreaElement).value })}></textarea></label>
           <label class="field full"><span>禁用场景</span><textarea .value=${component.disabledScenarios} @change=${(event: Event) => this.store.updateComponent({ disabledScenarios: (event.currentTarget as HTMLTextAreaElement).value })}></textarea></label>
         </div>
@@ -351,8 +398,11 @@ export class SpecA11yWorkbench extends LitElement {
   }
 
   private renderExample(component: ComponentSpec, example: ComponentExample): TemplateResult {
+    const codeConflict = this.store.conflicts.find(
+      (conflict) => conflict.kind === 'example' && conflict.targetId === example.id && conflict.field === 'code'
+    );
     return html`
-      <article class="example-card">
+      <article class="example-card ${codeConflict ? 'has-conflict' : ''}">
         <div class="example-head">
           <strong>${example.title}</strong>
           <span class="pill ${example.stale ? 'review' : 'published'}">${example.stale ? '需要迁移' : `r${example.createdFromRevision}`}</span>
@@ -360,9 +410,10 @@ export class SpecA11yWorkbench extends LitElement {
           <sp-action-button size="s" label="删除示例" @click=${() => this.store.removeExample(example.id)}>删除</sp-action-button>
         </div>
         ${example.stale ? html`<div class="issue warning"><strong>关联失效</strong>${example.staleReason}</div>` : nothing}
+        ${codeConflict ? html`<div class="issue warning"><strong>示例代码存在跨标签页冲突</strong>另一个标签页把同一段代码改成了不同内容，请到顶部“合并冲突”面板选择。</div>` : nothing}
         <div class="form-grid">
           <label class="field full"><span>标题</span><input type="text" .value=${example.title} @change=${(event: Event) => this.store.updateExample(example.id, { title: (event.currentTarget as HTMLInputElement).value })} /></label>
-          <label class="field full"><span>代码</span><textarea .value=${example.code} @change=${(event: Event) => this.store.updateExample(example.id, { code: (event.currentTarget as HTMLTextAreaElement).value })}></textarea></label>
+          <label class="field full ${codeConflict ? 'field-conflict' : ''}"><span>代码</span><textarea .value=${example.code} @change=${(event: Event) => this.store.updateExample(example.id, { code: (event.currentTarget as HTMLTextAreaElement).value })}></textarea></label>
           <div class="field full">
             <span>依赖属性</span>
             <div class="inline" style="flex-wrap: wrap">
@@ -435,6 +486,69 @@ export class SpecA11yWorkbench extends LitElement {
         `) : html`<div class="issue info"><strong>当前组件通过检查</strong>没有发现属性、示例或无障碍说明问题。</div>`) : nothing}
       </section>
     `;
+  }
+
+  private renderConflictCenter(): TemplateResult {
+    const conflicts = this.store.conflicts;
+    return html`
+      <section class="conflict-center" aria-label="合并冲突">
+        <div class="conflict-head">
+          <h2>检测到 ${conflicts.length} 处多标签页冲突</h2>
+          <p>同一属性或同一条示例代码在不同标签页中被改成了不同的新值，其他改动已自动合并。请为每处选择要保留的值，选择会同步给所有标签页。</p>
+        </div>
+        <div class="conflict-grid">
+          ${conflicts.map((conflict) => this.renderConflict(conflict))}
+        </div>
+      </section>
+    `;
+  }
+
+  private renderConflict(conflict: MergeConflict): TemplateResult {
+    const component = this.store.state.components.find((item) => item.id === conflict.componentId);
+    const targetName =
+      conflict.kind === 'property'
+        ? component?.properties.find((item) => item.id === conflict.targetId)?.name ?? '已删除属性'
+        : conflict.kind === 'example'
+          ? component?.examples.find((item) => item.id === conflict.targetId)?.title ?? '已删除示例'
+          : component?.name ?? '';
+    const kindLabel = conflict.kind === 'property' ? '属性' : conflict.kind === 'example' ? '示例代码' : '组件';
+    const goToTab = (): EditorTab => conflict.kind === 'example' ? 'examples' : 'api';
+    return html`
+      <article class="conflict-card">
+        <div class="conflict-title">
+          <strong>${kindLabel}冲突 · ${targetName} · ${conflict.label}</strong>
+          <span class="pill review">${component?.name ?? '未知组件'}</span>
+        </div>
+        <div class="conflict-options">
+          ${conflict.options.map((option, index) => html`
+            <button
+              class="conflict-option ${index === 0 ? 'latest' : ''}"
+              @click=${() => { this.store.resolveConflict(conflict, option.value); this.flash('已采用所选值并同步给所有标签页'); }}
+            >
+              <span class="option-meta">标签页 ${this.tabLabel(option.tabId)} · ${new Date(option.ts).toLocaleTimeString('zh-CN')}${index === 0 ? ' · 最新' : ''}</span>
+              ${conflict.field === 'code' ? html`<pre>${String(option.value ?? '')}</pre>` : html`<span class="option-value">${this.formatConflictValue(option.value)}</span>`}
+              <span class="option-choose">采用此值</span>
+            </button>
+          `)}
+        </div>
+        <div class="conflict-actions">
+          <button class="text-link" @click=${() => { if (component) this.store.select(component.id); this.tab = goToTab(); }}>前往对应编辑区</button>
+        </div>
+      </article>
+    `;
+  }
+
+  private formatConflictValue(value: unknown): string {
+    if (typeof value === 'boolean') return value ? '是（true）' : '否（false）';
+    if (Array.isArray(value)) return value.length ? value.join(', ') : '（空）';
+    const text = String(value ?? '');
+    return text.trim() ? text : '（空）';
+  }
+
+  private tabLabel(tabId: string): string {
+    if (tabId === this.store.tabId) return '本页';
+    const short = tabId.split('-').slice(-2).join('-');
+    return short ? `#${short.slice(0, 9)}` : tabId;
   }
 
   private get filteredComponents(): ComponentSpec[] {

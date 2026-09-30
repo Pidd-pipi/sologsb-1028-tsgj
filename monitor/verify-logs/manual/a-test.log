@@ -1,0 +1,45 @@
+
+> sologsb-1028-component-spec-a11y-workbench@1.0.0 test
+> node scripts/run-tests.mjs
+
+/Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/esbuild/lib/main.js:2033
+          throw new Error(`
+                ^
+
+Error: 
+You installed esbuild for another platform than the one you're currently using.
+This won't work because esbuild is written with native code and needs to
+install a platform-specific binary executable.
+
+Specifically the "@esbuild/linux-arm64" package is present but this platform
+needs the "@esbuild/darwin-arm64" package instead. People often get into this
+situation by installing esbuild on Windows or macOS and copying "node_modules"
+into a Docker image that runs Linux, or by copying "node_modules" between
+Windows and WSL environments.
+
+If you are installing with npm, you can try not copying the "node_modules"
+directory when you copy the files over, and running "npm ci" or "npm install"
+on the destination platform after the copy. Or you could consider using yarn
+instead of npm which has built-in support for installing a package on multiple
+platforms simultaneously.
+
+If you are installing with yarn, you can try listing both this platform and the
+other platform in your ".yarnrc.yml" file using the "supportedArchitectures"
+feature: https://yarnpkg.com/configuration/yarnrc/#supportedArchitectures
+Keep in mind that this means multiple copies of esbuild will be present.
+
+Another alternative is to use the "esbuild-wasm" package instead, which works
+the same way on all platforms. But it comes with a heavy performance cost and
+can sometimes be 10x slower than the "esbuild" package, so you may also not
+want to do that.
+
+    at generateBinPath (/Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/esbuild/lib/main.js:2033:17)
+    at esbuildCommandAndArgs (/Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/esbuild/lib/main.js:2114:33)
+    at ensureServiceIsRunning (/Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/esbuild/lib/main.js:2271:25)
+    at build (/Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/esbuild/lib/main.js:2170:26)
+    at file:///Users/yu/%E4%BB%93%E5%BA%93/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/scripts/run-tests.mjs:11:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v20.20.2

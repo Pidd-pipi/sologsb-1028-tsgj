@@ -1,0 +1,4 @@
+node_modules/
+dist/
+scripts/*.bundle.mjs
+scripts/*.js

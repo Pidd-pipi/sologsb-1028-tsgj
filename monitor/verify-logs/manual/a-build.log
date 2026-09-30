@@ -1,0 +1,38 @@
+
+> sologsb-1028-component-spec-a11y-workbench@1.0.0 build
+> tsc --noEmit && vite build
+
+/Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/rollup/dist/native.js:121
+		throw new Error(
+		      ^
+
+Error: Cannot find module @rollup/rollup-darwin-arm64. npm has a bug related to optional dependencies (https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing both package-lock.json and node_modules directory.
+    at requireWithFriendlyError (/Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/rollup/dist/native.js:121:9)
+    at Object.<anonymous> (/Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/rollup/dist/native.js:130:22)
+    ... 3 lines matching cause stack trace ...
+    at Module._load (node:internal/modules/cjs/loader:1091:12)
+    at cjsLoader (node:internal/modules/esm/translators:298:15)
+    at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:240:7)
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:606:24) {
+  [cause]: Error: Cannot find module '@rollup/rollup-darwin-arm64'
+  Require stack:
+  - /Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/rollup/dist/native.js
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+      at Module._load (node:internal/modules/cjs/loader:1038:27)
+      at Module.require (node:internal/modules/cjs/loader:1289:19)
+      at require (node:internal/modules/helpers:182:18)
+      at requireWithFriendlyError (/Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/rollup/dist/native.js:103:10)
+      at Object.<anonymous> (/Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/rollup/dist/native.js:130:22)
+      at Module._compile (node:internal/modules/cjs/loader:1521:14)
+      at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+      at Module.load (node:internal/modules/cjs/loader:1266:32)
+      at Module._load (node:internal/modules/cjs/loader:1091:12) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [
+      '/Users/yu/仓库/solo/sologsb/sologsb-0929/sologsb-1028-20260930-145138-0e2783c3/source/candidates/candidate-1/node_modules/rollup/dist/native.js'
+    ]
+  }
+}
+
+Node.js v20.20.2
