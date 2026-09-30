@@ -1,0 +1,14 @@
+import '@spectrum-web-components/theme/sp-theme.js';
+import '@spectrum-web-components/theme/theme-light.js';
+import '@spectrum-web-components/theme/theme-dark.js';
+import '@spectrum-web-components/theme/scale-medium.js';
+import '@spectrum-web-components/theme/scale-large.js';
+import '@spectrum-web-components/button/sp-button.js';
+import '@spectrum-web-components/action-button/sp-action-button.js';
+import '@spectrum-web-components/search/sp-search.js';
+import '@spectrum-web-components/textfield/sp-textfield.js';
+import '@spectrum-web-components/switch/sp-switch.js';
+import '@spectrum-web-components/picker/sp-picker.js';
+import '@spectrum-web-components/menu/sp-menu-item.js';
+import '@spectrum-web-components/toast/sp-toast.js';
+import './workbench';
