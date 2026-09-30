@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { diffAgainstSnapshot } from './diff';
-import { SpecStore } from './store';
+import { SpecStore, type Conflict } from './store';
 import type { ComponentExample, ComponentSpec, PreviewDensity, PreviewTheme, PropertySpec, ValidationIssue } from './types';
 
 type EditorTab = 'overview' | 'api' | 'accessibility' | 'examples' | 'history';
@@ -112,6 +112,16 @@ export class SpecA11yWorkbench extends LitElement {
     .diff-row b { display: block; margin-bottom: 4px; text-transform: capitalize; }
     .before { color: var(--spectrum-red-800); white-space: pre-wrap; }
     .after { color: var(--spectrum-green-900); white-space: pre-wrap; }
+    .conflicts { display: grid; gap: 10px; margin-bottom: 16px; }
+    .conflict-panel { border: 1px solid var(--spectrum-orange-500); border-left: 4px solid var(--spectrum-orange-600); border-radius: 10px; background: var(--spectrum-gray-50); padding: 13px 15px; }
+    .conflict-head { display: grid; gap: 2px; margin-bottom: 10px; font-size: 12px; }
+    .conflict-head strong { color: var(--spectrum-orange-700); }
+    .conflict-options { display: grid; gap: 8px; }
+    .conflict-option { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; gap: 2px 10px; align-items: center; border: 1px solid var(--spectrum-gray-300); border-radius: 8px; padding: 9px 11px; cursor: pointer; }
+    .conflict-option:hover { background: var(--spectrum-gray-100); }
+    .conflict-option input { grid-row: 1 / -1; }
+    .conflict-value { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+    .conflict-meta { color: var(--spectrum-gray-700); font-size: 10px; }
     pre { white-space: pre-wrap; word-break: break-word; background: #202020; color: #f5f5f5; padding: 12px; border-radius: 8px; font-size: 12px; }
     .search-empty { padding: 20px 8px; color: var(--spectrum-gray-700); font-size: 13px; }
     .footer-hint { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 30; background: #202020; color: white; border-radius: 999px; padding: 6px 12px; font-size: 11px; opacity: .9; }
@@ -262,6 +272,7 @@ export class SpecA11yWorkbench extends LitElement {
         ${this.renderTab('examples', '4 示例')}
         ${this.renderTab('history', '5 版本')}
       </div>
+      ${this.renderConflicts(component)}
       ${this.tab === 'overview' ? this.renderOverview(component) : nothing}
       ${this.tab === 'api' ? this.renderApi(component) : nothing}
       ${this.tab === 'accessibility' ? this.renderAccessibility(component) : nothing}
@@ -272,6 +283,40 @@ export class SpecA11yWorkbench extends LitElement {
 
   private renderTab(tab: EditorTab, label: string): TemplateResult {
     return html`<button class="tab" role="tab" aria-selected=${this.tab === tab} @click=${() => { this.tab = tab; }}>${label}</button>`;
+  }
+
+  private renderConflicts(component: ComponentSpec): TemplateResult {
+    const conflicts = this.store.conflictsFor(component.id);
+    if (!conflicts.length) return html``;
+    return html`
+      <div class="conflicts" role="alert">
+        ${conflicts.map((conflict) => this.renderConflict(conflict))}
+      </div>
+    `;
+  }
+
+  private renderConflict(conflict: Conflict): TemplateResult {
+    const label = conflict.kind === 'property-name' ? '属性名称' : '示例代码';
+    const target = conflict.kind === 'property-name'
+      ? this.store.selected?.properties.find((item) => item.id === conflict.targetId)?.name
+      : this.store.selected?.examples.find((item) => item.id === conflict.targetId)?.title;
+    return html`
+      <section class="conflict-panel">
+        <div class="conflict-head">
+          <strong>检测到${label}冲突</strong>
+          <span>「${target ?? conflict.targetId}」在其他标签页被改为不同的值，请选择保留哪一个。</span>
+        </div>
+        <div class="conflict-options">
+          ${conflict.options.map((option) => html`
+            <label class="conflict-option">
+              <input type="radio" name=${conflict.key} @change=${() => this.store.resolveConflict(conflict.key, option.opId)} />
+              <span class="conflict-value">${option.value || '（空）'}</span>
+              <span class="conflict-meta">标签页 ${option.tabId.slice(-6)} · ${new Date(this.store.opTimestamp(option.opId)).toLocaleString('zh-CN')}</span>
+            </label>
+          `)}
+        </div>
+      </section>
+    `;
   }
 
   private renderOverview(component: ComponentSpec): TemplateResult {
